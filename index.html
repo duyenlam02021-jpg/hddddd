@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>App Chấm Điểm Phát Âm Tiếng Trung</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+        }
+        h1 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        .sentence-box {
+            background-color: #e8f0fe;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .pinyin {
+            font-size: 18px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .chinese {
+            font-size: 32px;
+            color: #1a73e8;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+        .translation {
+            font-size: 14px;
+            color: #5f6368;
+            margin-top: 10px;
+            font-style: italic;
+        }
+        .btn {
+            background-color: #1a73e8;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            border-radius: 24px;
+            cursor: pointer;
+            transition: background 0.3s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .btn:hover {
+            background-color: #1557b0;
+        }
+        .btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .recording {
+            animation: pulse 1.5s infinite;
+            background-color: #ea4335 !important;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        .result-box {
+            margin-top: 25px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+        .score {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .user-speech {
+            font-size: 16px;
+            color: #555;
+        }
+        .success { background-color: #e6f4ea; color: #137333; }
+        .warning { background-color: #ffeeee; color: #c5221f; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Phát Âm Tiếng Trung Giản Thể</h1>
+    
+    <div class="sentence-box">
+        <div class="pinyin" id="pinyin">Nǐ hǎo, lǎoshī!</div>
+        <div class="chinese" id="targetSentence">你好，老师！</div>
+        <div class="translation" id="translation">Nghĩa: Xin chào thầy/cô giáo!</div>
+    </div>
+
+    <button class="btn" id="recordBtn">Bắt đầu đọc</button>
+
+    <div class="result-box" id="resultBox">
+        <div class="score" id="scoreText">0%</div>
+        <div class="user-speech" id="userSpeechText">Bạn đã nói: </div>
+    </div>
+</div>
+
+<script>
+    // Danh sách câu hỏi mẫu (Tiếng Trung Giản Thể)
+    const lessons = [
+        { chinese: "你好，老师！", pinyin: "Nǐ hǎo, lǎoshī!", translation: "Xin chào thầy/cô giáo!" },
+        { chinese: "你叫什么名字？", pinyin: "Nǐ jiào shénme míngzi?", translation: "Bạn tên là gì?" },
+        { chinese: "我喜欢学汉语。", pinyin: "Wǒ xǐhuan xué Hànyǔ.", translation: "Tôi thích học tiếng Trung." },
+        { chinese: "今天天气很好。", pinyin: "Jīntiān tiānqì hěn hǎo.", translation: "Hôm nay thời tiết rất tốt." }
+    ];
+
+    // Chọn ngẫu nhiên 1 câu khi load trang
+    const currentLesson = lessons[Math.floor(Math.random() * lessons.length)];
+    document.getElementById('targetSentence').innerText = currentLesson.chinese;
+    document.getElementById('pinyin').innerText = currentLesson.pinyin;
+    document.getElementById('translation').innerText = "Nghĩa: " + currentLesson.translation;
+
+    const recordBtn = document.getElementById('recordBtn');
+    const resultBox = document.getElementById('resultBox');
+    const scoreText = document.getElementById('scoreText');
+    const userSpeechText = document.getElementById('userSpeechText');
+
+    // Kiểm tra trình duyệt có hỗ trợ nhận diện giọng nói không
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+        alert("Trình duyệt của bạn không hỗ trợ nhận diện giọng nói. Vui lòng dùng Google Chrome!");
+        recordBtn.disabled = true;
+    } else {
+        const recognition = new SpeechRecognition();
+        // Cấu hình nhận diện Tiếng Trung Giản Thể (Trung Quốc Đại Lục)
+        recognition.lang = 'zh-CN'; 
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        let isRecording = false;
+
+        recordBtn.addEventListener('click', () => {
+            if (!isRecording) {
+                recognition.start();
+            } else {
+                recognition.stop();
+            }
+        });
+
+        recognition.onstart = () => {
+            isRecording = true;
+            recordBtn.innerText = "Đang nghe... Hãy nói đi!";
+            recordBtn.classList.add('recording');
+            resultBox.style.display = 'none';
+        };
+
+        recognition.onend = () => {
+            isRecording = false;
+            recordBtn.innerText = "Bắt đầu đọc";
+            recordBtn.classList.remove('recording');
+        };
+
+        recognition.onresult = (event) => {
+            // Lấy văn bản mà Google nhận diện được từ giọng học sinh
+            let userSpeech = event.results[0][0].transcript;
+            
+            // Làm sạch chuỗi (xóa dấu câu để so sánh chính xác hơn)
+            let cleanTarget = cleanText(currentLesson.chinese);
+            let cleanUser = cleanText(userSpeech);
+
+            // Tính toán số ký tự khớp nhau
+            let matchCount = 0;
+            for (let char of cleanUser) {
+                if (cleanTarget.includes(char)) {
+                    matchCount++;
+                }
+            }
+
+            // Tính phần trăm điểm số
+            let score = Math.round((matchCount / cleanTarget.length) * 100);
+            if (score > 100) score = 100; // Giới hạn max 100%
+
+            // Hiển thị kết quả
+            resultBox.style.display = 'block';
+            userSpeechText.innerText = "Bạn đã nói: " + userSpeech;
+            scoreText.innerText = score + "%";
+
+            if (score >= 80) {
+                resultBox.className = "result-box success";
+            } else {
+                resultBox.className = "result-box warning";
+            }
+        };
+
+        recognition.onerror = (event) => {
+            alert("Có lỗi xảy ra: " + event.error);
+        };
+    }
+
+    // Hàm xóa dấu câu tiếng Trung để so sánh ký tự
+    function cleanText(text) {
+        return text.replace(/[，。？！、；：“”‘’（）]/g, "").trim();
+    }
+</script>
+
+</body>
+</html>
